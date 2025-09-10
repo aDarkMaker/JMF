@@ -12,5 +12,8 @@
   "devDependencies": {
     "electron": "^38.0.0"
   },
-  "productName": "JMcomic Fetcher"
+  "productName": "JMcomic Fetcher",
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
 }

@@ -1,7 +1,84 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron')
 const path = require('path')
 const { spawn, spawnSync } = require('child_process')
 const fs = require('fs')
+
+// 简单的YAML解析器（用于基本的option.yml文件）
+function parseYAML(yamlString) {
+    const lines = yamlString.split('\n');
+    const result = {};
+    const stack = [{ obj: result, indent: -1 }];
+
+    for (let line of lines) {
+        line = line.replace(/\r$/, ''); // 移除回车符
+        if (!line.trim() || line.trim().startsWith('#')) continue;
+
+        const indent = line.length - line.trimLeft().length;
+        const trimmedLine = line.trim();
+
+        // 弹出栈直到找到正确的父级
+        while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+            stack.pop();
+        }
+
+        const currentObj = stack[stack.length - 1].obj;
+
+        if (trimmedLine.startsWith('- ')) {
+            // 处理列表项
+            const value = trimmedLine.substring(2).trim();
+            const keys = Object.keys(currentObj);
+            const lastKey = keys[keys.length - 1];
+
+            if (!Array.isArray(currentObj[lastKey])) {
+                currentObj[lastKey] = [];
+            }
+            currentObj[lastKey].push(value);
+        } else if (trimmedLine.includes(':')) {
+            const colonIndex = trimmedLine.indexOf(':');
+            const key = trimmedLine.substring(0, colonIndex).trim();
+            const value = trimmedLine.substring(colonIndex + 1).trim();
+
+            if (value === '' || value === null) {
+                currentObj[key] = {};
+                stack.push({ obj: currentObj[key], indent: indent });
+            } else if (value === 'true') {
+                currentObj[key] = true;
+            } else if (value === 'false') {
+                currentObj[key] = false;
+            } else if (value === 'null') {
+                currentObj[key] = null;
+            } else if (!isNaN(value) && value !== '') {
+                currentObj[key] = Number(value);
+            } else {
+                currentObj[key] = value;
+            }
+        }
+    }
+
+    return result;
+}
+
+// 简单的YAML生成器
+function generateYAML(obj, indent = 0) {
+    let yaml = '';
+    const spaces = '  '.repeat(indent);
+
+    for (const [key, value] of Object.entries(obj)) {
+        if (Array.isArray(value)) {
+            yaml += `${spaces}${key}:\n`;
+            for (const item of value) {
+                yaml += `${spaces}- ${item}\n`;
+            }
+        } else if (typeof value === 'object' && value !== null) {
+            yaml += `${spaces}${key}:\n`;
+            yaml += generateYAML(value, indent + 1);
+        } else {
+            yaml += `${spaces}${key}: ${value}\n`;
+        }
+    }
+
+    return yaml;
+}
 
 let mainWindow
 
@@ -12,6 +89,7 @@ const downloaderScript = path.join(coreDir, 'downloader.py')
 const depsScript = path.join(coreDir, 'deps.py')
 
 function createWindow() {
+    // 先创建一个隐藏的窗口来测量内容大小
     mainWindow = new BrowserWindow({
         width: 1000,
         height: 720,
@@ -27,18 +105,190 @@ function createWindow() {
             sandbox: false,
         },
         icon: path.join(__dirname, 'assets', 'icon', 'icon.png'),
-        show: false
+        show: false,
+        resizable: true
     })
 
     mainWindow.loadFile(path.join(__dirname, 'index.html'))
 
     mainWindow.once('ready-to-show', () => {
-        mainWindow.show()
+        // 动态调整窗口大小以适应内容
+        adjustWindowSize()
     })
 
     mainWindow.setMenuBarVisibility(false)
 
     ensureOutputDirectory()
+}
+
+// 动态调整窗口大小函数
+async function adjustWindowSize() {
+    try {
+        // 获取内容的实际尺寸
+        const contentSize = await mainWindow.webContents.executeJavaScript(`
+            (function() {
+                // 等待DOM完全渲染
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        const container = document.querySelector('.container');
+                        const mainCard = document.querySelector('.main-card');
+                        
+                        if (container && mainCard) {
+                            // 计算各个组件的实际高度
+                            const header = document.querySelector('.header');
+                            const inputSection = document.querySelector('.input-section');
+                            const toolbar = document.querySelector('.toolbar');
+                            const logSection = document.querySelector('.log-section');
+                            const logContainer = document.querySelector('.log-container');
+                            const progressBar = document.querySelector('.progress-bar');
+                            
+                            let totalContentHeight = 0;
+                            const cardPadding = 60; // main-card的padding
+                            const containerPadding = 40; // container的padding
+                            const titlebarHeight = 40; // 标题栏高度
+                            const extraMargin = 60; // 额外的边距
+                            
+                            // 计算每个部分的高度
+                            if (header) {
+                                totalContentHeight += header.offsetHeight + 30; // header + margin
+                            }
+                            
+                            if (inputSection) {
+                                totalContentHeight += inputSection.offsetHeight + 20; // input section + margin
+                            }
+                            
+                            if (progressBar && progressBar.style.display !== 'none') {
+                                totalContentHeight += progressBar.offsetHeight + 20; // progress bar + margin
+                            }
+                            
+                            if (toolbar) {
+                                totalContentHeight += toolbar.offsetHeight + 20; // toolbar + margin
+                            }
+                            
+                            // 日志区域的特殊处理
+                            if (logSection && logContainer) {
+                                const logHeader = logSection.querySelector('.log-header');
+                                let logSectionHeight = 0;
+                                
+                                if (logHeader) {
+                                    logSectionHeight += logHeader.offsetHeight + 15; // log header + margin
+                                }
+                                
+                                // 计算日志内容的实际高度
+                                const logView = logContainer.querySelector('#logView');
+                                let logContentHeight = 200; // 最小高度
+                                
+                                if (logView) {
+                                    // 获取实际的滚动高度
+                                    const actualScrollHeight = logView.scrollHeight;
+                                    const logContent = logView.textContent || logView.innerText || '';
+                                    const logLines = Math.max(1, logContent.split('\\n').length);
+                                    
+                                    // 计算基于行高的高度
+                                    const lineHeight = parseInt(getComputedStyle(logView).lineHeight) || 19.5;
+                                    const calculatedHeight = logLines * lineHeight;
+                                    
+                                    // 使用更准确的高度计算
+                                    const contentBasedHeight = Math.max(actualScrollHeight, calculatedHeight);
+                                    
+                                    // 加上padding和边距
+                                    const logPadding = 40;
+                                    const containerBorders = 4; // border + outline
+                                    
+                                    // 设置合理的范围，但允许更大的最大值
+                                    logContentHeight = Math.max(200, Math.min(600, contentBasedHeight + logPadding + containerBorders));
+                                    
+                                    console.log('日志高度计算:', {
+                                        lines: logLines,
+                                        lineHeight: lineHeight,
+                                        scrollHeight: actualScrollHeight,
+                                        calculatedHeight: calculatedHeight,
+                                        finalHeight: logContentHeight
+                                    });
+                                }
+                                
+                                logSectionHeight += logContentHeight;
+                                totalContentHeight += logSectionHeight + 20; // log section + margin
+                            }
+                            
+                            const idealContentHeight = totalContentHeight + cardPadding;
+                            const idealWindowHeight = idealContentHeight + containerPadding + titlebarHeight + extraMargin;
+                            
+                            // 计算理想宽度
+                            const cardRect = mainCard.getBoundingClientRect();
+                            const idealWidth = Math.max(900, Math.min(1200, cardRect.width + containerPadding + 40));
+                            const idealHeight = Math.max(600, Math.min(1100, idealWindowHeight));
+                            
+                            resolve({
+                                width: idealWidth,
+                                height: idealHeight,
+                                contentHeight: totalContentHeight,
+                                hasScrollbar: container.scrollHeight > container.clientHeight,
+                                debug: {
+                                    logLines: logContainer ? (logContainer.textContent || '').split('\\n').length : 0,
+                                    calculatedContentHeight: totalContentHeight,
+                                    idealWindowHeight: idealWindowHeight,
+                                    components: {
+                                        header: header ? header.offsetHeight : 0,
+                                        input: inputSection ? inputSection.offsetHeight : 0,
+                                        toolbar: toolbar ? toolbar.offsetHeight : 0,
+                                        logSection: logSection ? logSection.offsetHeight : 0,
+                                        logContainer: logContainer ? logContainer.offsetHeight : 0
+                                    }
+                                }
+                            });
+                        } else {
+                            resolve({ width: 1000, height: 720, contentHeight: 0, hasScrollbar: false });
+                        }
+                    }, 100);
+                });
+            })();
+        `)
+
+        // 获取当前窗口大小
+        const currentSize = mainWindow.getSize()
+        const [currentWidth, currentHeight] = currentSize
+
+        // 如果大小需要调整（更敏感的检测）
+        const sizeDifference = Math.abs(contentSize.height - currentHeight)
+        if (sizeDifference > 30) { // 降低阈值，更积极地调整
+            const newWidth = Math.round(contentSize.width)
+            const newHeight = Math.round(contentSize.height)
+
+            // 获取屏幕工作区域
+            const { screen } = require('electron')
+            const workArea = screen.getPrimaryDisplay().workAreaSize
+
+            // 确保窗口不超过屏幕大小
+            const finalWidth = Math.min(newWidth, workArea.width - 100)
+            const finalHeight = Math.min(newHeight, workArea.height - 80)
+
+            // 设置新的窗口大小
+            mainWindow.setSize(finalWidth, finalHeight, true)
+
+            // 保持窗口居中
+            mainWindow.center()
+
+            console.log(`窗口大小已调整: ${currentWidth}x${currentHeight} -> ${finalWidth}x${finalHeight}`)
+            console.log('日志行数:', contentSize.debug.logLines)
+            console.log('组件高度:', contentSize.debug.components)
+        }
+
+        // 确保窗口可见
+        if (!mainWindow.isVisible()) {
+            mainWindow.show()
+        }
+
+        return true
+
+    } catch (error) {
+        console.error('调整窗口大小失败:', error)
+        // 如果调整失败，确保窗口至少是可见的
+        if (!mainWindow.isVisible()) {
+            mainWindow.show()
+        }
+        throw error
+    }
 }
 
 function ensureOutputDirectory() {
@@ -139,6 +389,20 @@ ipcMain.on('win:toggle-maximize', () => {
 
 ipcMain.on('win:close', () => {
     mainWindow?.close()
+})
+
+// 动态调整窗口大小请求
+ipcMain.handle('request-window-resize', async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+            await adjustWindowSize()
+            return { success: true }
+        } catch (error) {
+            console.error('动态调整窗口大小失败:', error)
+            return { success: false, error: error.message }
+        }
+    }
+    return { success: false, error: '窗口不可用' }
 })
 
 ipcMain.on('download', async (event, albumId) => {
@@ -283,6 +547,260 @@ ipcMain.handle('open-outdir', async () => {
         return {
             ok: false,
             message: `无法打开输出目录: ${error.message}`
+        }
+    }
+})
+
+// 获取PDF文件列表
+ipcMain.handle('get-pdf-list', async () => {
+    try {
+        ensureOutputDirectory()
+
+        const files = fs.readdirSync(outputDir)
+            .filter(file => file.toLowerCase().endsWith('.pdf'))
+            .map(file => ({
+                name: file,
+                path: path.join(outputDir, file),
+                size: fs.statSync(path.join(outputDir, file)).size,
+                created: fs.statSync(path.join(outputDir, file)).birthtime
+            }))
+            .sort((a, b) => b.created - a.created) // 按创建时间倒序
+
+        return files
+    } catch (error) {
+        console.error('获取PDF列表失败:', error)
+        return []
+    }
+})
+
+// 获取设置
+ipcMain.handle('get-settings', async () => {
+    try {
+        const configPath = path.join(coreDir, 'option.yml')
+        const settingsPath = path.join(appDir, 'settings.json')
+
+        let settings = {
+            general: {
+                outputDir: outputDir,
+                autoOpenDir: false
+            },
+            download: {},
+            advanced: {}
+        }
+
+        // 读取option.yml
+        if (fs.existsSync(configPath)) {
+            const configContent = fs.readFileSync(configPath, 'utf8')
+            const config = parseYAML(configContent)
+
+            if (config.client && config.client.domain) {
+                settings.download.domains = config.client.domain
+            }
+            if (config.client && config.client.retry_times) {
+                settings.download.retryTimes = config.client.retry_times
+            }
+            if (config.download && config.download.threading && config.download.threading.image) {
+                settings.download.imageThreads = config.download.threading.image
+            }
+            if (config.client && config.client.postman && config.client.postman.meta_data && config.client.postman.meta_data.proxies) {
+                settings.download.enableProxy = !!config.client.postman.meta_data.proxies
+                settings.download.proxyAddress = config.client.postman.meta_data.proxies || '127.0.0.1:7890'
+            }
+            if (config.log !== undefined) {
+                settings.advanced.enableLog = config.log
+            }
+            if (config.download && config.download.image && config.download.image.suffix) {
+                settings.advanced.imageFormat = config.download.image.suffix
+            }
+            if (config.download && config.download.cache !== undefined) {
+                settings.advanced.enableCache = config.download.cache
+            }
+        }
+
+        // 读取应用设置
+        if (fs.existsSync(settingsPath)) {
+            const appSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
+            settings = { ...settings, ...appSettings }
+        }
+
+        return settings
+    } catch (error) {
+        console.error('读取设置失败:', error)
+        return {}
+    }
+})
+
+// 保存设置
+ipcMain.handle('save-settings', async (event, settings) => {
+    try {
+        const configPath = path.join(coreDir, 'option.yml')
+        const settingsPath = path.join(appDir, 'settings.json')
+
+        // 更新option.yml
+        let config = {}
+        if (fs.existsSync(configPath)) {
+            const configContent = fs.readFileSync(configPath, 'utf8')
+            config = parseYAML(configContent) || {}
+        }
+
+        // 应用下载设置到option.yml
+        if (settings.download) {
+            if (!config.client) config.client = {}
+            if (!config.download) config.download = {}
+
+            if (settings.download.domains) {
+                config.client.domain = settings.download.domains
+            }
+            if (settings.download.retryTimes) {
+                config.client.retry_times = settings.download.retryTimes
+            }
+            if (settings.download.imageThreads) {
+                if (!config.download.threading) config.download.threading = {}
+                config.download.threading.image = settings.download.imageThreads
+            }
+            if (settings.download.enableProxy !== undefined) {
+                if (!config.client.postman) config.client.postman = {}
+                if (!config.client.postman.meta_data) config.client.postman.meta_data = {}
+                config.client.postman.meta_data.proxies = settings.download.enableProxy ? settings.download.proxyAddress : null
+            }
+        }
+
+        if (settings.advanced) {
+            if (settings.advanced.enableLog !== undefined) {
+                config.log = settings.advanced.enableLog
+            }
+            if (settings.advanced.imageFormat) {
+                if (!config.download) config.download = {}
+                if (!config.download.image) config.download.image = {}
+                config.download.image.suffix = settings.advanced.imageFormat
+            }
+            if (settings.advanced.enableCache !== undefined) {
+                if (!config.download) config.download = {}
+                config.download.cache = settings.advanced.enableCache
+            }
+        }
+
+        // 写入option.yml
+        fs.writeFileSync(configPath, generateYAML(config), 'utf8')
+
+        // 保存应用设置
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8')
+
+        // 更新输出目录
+        if (settings.general && settings.general.outputDir) {
+            // 这里可以考虑重新创建输出目录
+            // 但需要谨慎处理，避免丢失现有文件
+        }
+
+        return { success: true }
+    } catch (error) {
+        console.error('保存设置失败:', error)
+        throw error
+    }
+})
+
+// 选择目录
+ipcMain.handle('select-directory', async () => {
+    try {
+        const result = await dialog.showOpenDialog(mainWindow, {
+            properties: ['openDirectory'],
+            title: '选择输出目录'
+        })
+
+        if (!result.canceled && result.filePaths.length > 0) {
+            return result.filePaths[0]
+        }
+
+        return null
+    } catch (error) {
+        console.error('选择目录失败:', error)
+        return null
+    }
+})
+
+// 获取PDF文件信息
+ipcMain.handle('get-pdf-info', async (event, filePath) => {
+    try {
+        const stats = fs.statSync(filePath)
+        const fileName = path.basename(filePath)
+
+        return {
+            name: fileName,
+            path: filePath,
+            size: stats.size,
+            created: stats.birthtime,
+            modified: stats.mtime,
+            pages: null // PDF页数需要额外的库来获取，这里暂时返回null
+        }
+    } catch (error) {
+        console.error('获取PDF信息失败:', error)
+        throw new Error(`无法获取PDF文件信息: ${error.message}`)
+    }
+})
+
+// 在新窗口中打开PDF
+ipcMain.handle('open-pdf-new-window', async (event, filePath) => {
+    try {
+        const fileName = path.basename(filePath)
+
+        // 创建一个新的窗口来显示PDF
+        const pdfWindow = new BrowserWindow({
+            width: 1000,
+            height: 800,
+            title: `PDF预览 - ${fileName}`,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                sandbox: false // 需要访问本地文件
+            },
+            icon: path.join(__dirname, 'assets', 'icon', 'icon.png'),
+            show: false
+        })
+
+        // 加载我们的PDF预览页面
+        const viewerPath = path.join(__dirname, 'pdf-viewer.html')
+        const queryParams = new URLSearchParams({
+            file: filePath,
+            name: fileName
+        })
+
+        await pdfWindow.loadFile(viewerPath, { search: queryParams.toString() })
+
+        pdfWindow.setMenuBarVisibility(false)
+
+        pdfWindow.once('ready-to-show', () => {
+            pdfWindow.show()
+        })
+
+        return { success: true, message: 'PDF已在新窗口中打开' }
+    } catch (error) {
+        console.error('在新窗口打开PDF失败:', error)
+        // 如果新窗口失败，尝试用外部程序打开
+        try {
+            const result = await shell.openPath(filePath)
+            return {
+                success: !result,
+                message: result || 'PDF已用外部程序打开（新窗口模式不可用）'
+            }
+        } catch (fallbackError) {
+            throw new Error(`无法打开PDF文件: ${error.message}`)
+        }
+    }
+})
+
+// 外部打开PDF文件
+ipcMain.handle('open-pdf-external', async (event, filePath) => {
+    try {
+        const result = await shell.openPath(filePath)
+        return {
+            success: !result, // shell.openPath returns empty string on success
+            message: result || 'PDF已用外部程序打开'
+        }
+    } catch (error) {
+        console.error('打开PDF失败:', error)
+        return {
+            success: false,
+            message: `无法打开PDF文件: ${error.message}`
         }
     }
 })

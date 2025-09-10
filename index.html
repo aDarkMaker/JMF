@@ -64,11 +64,6 @@
           </button>
         </div>
 
-        <!-- 进度条 -->
-        <div class="progress-bar" id="progressBar" style="display: none;">
-          <div class="progress-fill" id="progressFill"></div>
-        </div>
-
         <!-- 工具栏 -->
         <div class="toolbar">
           <button id="btnInstall" class="btn success">
@@ -79,10 +74,23 @@
             <span>📁</span>
             打开输出目录
           </button>
+          <button id="btnPreview" class="btn">
+            <span>📖</span>
+            PDF预览
+          </button>
+          <button id="btnSettings" class="btn">
+            <span>⚙️</span>
+            设置
+          </button>
           <button id="btnClear" class="btn danger">
             <span>🗑️</span>
             清空日志
           </button>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="progress-bar" id="progressBar" style="display: none;">
+          <div class="progress-fill" id="progressFill"></div>
         </div>
 
         <!-- 日志区域 -->
@@ -96,7 +104,123 @@
       </div>
     </div>
 
+    <!-- PDF预览模态框 -->
+    <div id="pdfModal" class="modal" style="display: none;">
+      <div class="modal-content pdf-viewer">
+        <div class="modal-header">
+          <h3>PDF预览</h3>
+          <button id="closePdfModal" class="btn close-btn">✕</button>
+        </div>
+        <div class="pdf-controls">
+          <select id="pdfFileSelect" class="pdf-select">
+            <option value="">选择PDF文件</option>
+          </select>
+          <div class="pdf-nav">
+            <button id="prevPage" class="btn" disabled>上一页</button>
+            <span id="pageInfo">页 1 / 1</span>
+            <button id="nextPage" class="btn" disabled>下一页</button>
+          </div>
+          <div class="pdf-zoom">
+            <button id="zoomOut" class="btn">缩小</button>
+            <span id="zoomLevel">100%</span>
+            <button id="zoomIn" class="btn">放大</button>
+          </div>
+        </div>
+        <div id="pdfContainer" class="pdf-container">
+          <div class="pdf-placeholder">
+            <span>📄</span>
+            <p>请选择PDF文件进行预览</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div id="settingsModal" class="modal" style="display: none;">
+      <div class="modal-content settings-panel">
+        <div class="modal-header">
+          <h3>应用设置</h3>
+          <button id="closeSettingsModal" class="btn close-btn">✕</button>
+        </div>
+        <div class="settings-tabs">
+          <button class="tab-btn active" data-tab="general">常规设置</button>
+          <button class="tab-btn" data-tab="download">下载设置</button>
+          <button class="tab-btn" data-tab="advanced">高级设置</button>
+        </div>
+        
+        <!-- 常规设置 -->
+        <div id="generalTab" class="tab-content active">
+          <div class="setting-group">
+            <label>输出目录</label>
+            <div class="setting-input">
+              <input type="text" id="outputDirInput" readonly />
+              <button id="browseOutputDir" class="btn">浏览</button>
+            </div>
+          </div>
+          <div class="setting-group">
+            <label>自动打开输出目录</label>
+            <input type="checkbox" id="autoOpenDir" />
+          </div>
+        </div>
+
+        <!-- 下载设置 -->
+        <div id="downloadTab" class="tab-content">
+          <div class="setting-group">
+            <label>下载域名</label>
+            <div id="domainList" class="domain-list"></div>
+            <div class="domain-input">
+              <input type="text" id="newDomain" placeholder="添加新域名" />
+              <button id="addDomain" class="btn">添加</button>
+            </div>
+          </div>
+          <div class="setting-group">
+            <label>重试次数</label>
+            <input type="number" id="retryTimes" min="1" max="10" />
+          </div>
+          <div class="setting-group">
+            <label>图片线程数</label>
+            <input type="number" id="imageThreads" min="1" max="50" />
+          </div>
+          <div class="setting-group">
+            <label>启用代理</label>
+            <input type="checkbox" id="enableProxy" />
+          </div>
+          <div class="setting-group proxy-settings" style="display: none;">
+            <label>代理地址</label>
+            <input type="text" id="proxyAddress" placeholder="127.0.0.1:7890" />
+          </div>
+        </div>
+
+        <!-- 高级设置 -->
+        <div id="advancedTab" class="tab-content">
+          <div class="setting-group">
+            <label>启用日志</label>
+            <input type="checkbox" id="enableLog" />
+          </div>
+          <div class="setting-group">
+            <label>图片格式</label>
+            <select id="imageFormat">
+              <option value=".jpg">JPG</option>
+              <option value=".png">PNG</option>
+              <option value=".webp">WebP</option>
+            </select>
+          </div>
+          <div class="setting-group">
+            <label>启用缓存</label>
+            <input type="checkbox" id="enableCache" />
+          </div>
+        </div>
+
+        <div class="settings-actions">
+          <button id="resetSettings" class="btn danger">重置为默认</button>
+          <button id="saveSettings" class="btn primary">保存设置</button>
+        </div>
+      </div>
+    </div>
+
     <!-- JavaScript -->
+    <script src="./scripts/pdf-viewer.js"></script>
+    <script src="./scripts/settings-manager.js"></script>
     <script src="./scripts/app.js"></script>
   </body>
 </html>
