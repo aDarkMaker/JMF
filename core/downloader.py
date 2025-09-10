@@ -1,5 +1,3 @@
-
-
 import os
 import sys
 import yaml
@@ -11,12 +9,10 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 
-# 设置控制台输出编码，解决中文乱码问题
 if sys.platform.startswith('win'):
     import codecs
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
-    # 设置控制台代码页为UTF-8
     os.system('chcp 65001 >nul 2>&1')
 
 try:
@@ -116,7 +112,7 @@ class JMcomicDownloader:
             return DownloadConfig(
                 domains=domains,
                 base_dir=data.get('dir_rule', {}).get('base_dir', '.'),
-                output_dir="PDF",
+                output_dir="../PDF",
                 max_retries=data.get('client', {}).get('retry_times', 3)
             )
         except Exception as e:
@@ -125,7 +121,7 @@ class JMcomicDownloader:
             return DownloadConfig(domains=[
                 '18comic-mygo.vip',
                 '18comic-mygo.org'
-            ])
+            ], output_dir="../PDF")
     
     def setup_domains(self) -> bool:
         """设置可用域名"""

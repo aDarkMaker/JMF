@@ -22,7 +22,6 @@ class JMcomicApp {
             btnInstall: document.getElementById('btnInstall'),
             btnOpenOut: document.getElementById('btnOpenOut'),
             btnClear: document.getElementById('btnClear'),
-            btnSettings: document.getElementById('btnSettings'),
 
             // 窗口控制
             btnMin: document.getElementById('btnMin'),
@@ -43,7 +42,6 @@ class JMcomicApp {
         this.elements.btnInstall.addEventListener('click', () => this.handleInstallDeps());
         this.elements.btnOpenOut.addEventListener('click', () => this.handleOpenOutDir());
         this.elements.btnClear.addEventListener('click', () => this.handleClearLog());
-        this.elements.btnSettings.addEventListener('click', () => this.handleSettings());
 
         // 窗口控制
         this.elements.btnMin.addEventListener('click', () => window.jmf?.win?.minimize());
@@ -241,12 +239,6 @@ class JMcomicApp {
         this.elements.logView.textContent = '';
         this.appendLog('日志已清空\n');
         this.updateLogHint('日志已清空');
-    }
-
-    // 设置（占位功能）
-    handleSettings() {
-        this.appendLog('⚙️ 设置功能开发中...\n', 'warning');
-        this.showNotification('设置功能即将推出', 'info');
     }
 
     // 显示通知（简单的状态提示）
