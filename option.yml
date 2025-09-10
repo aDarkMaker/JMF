@@ -1,0 +1,20 @@
+client:
+  domain:
+  - 18comic-mygo.vip
+  - 18comic-mygo.org
+  - 18comic-MHWs.CC
+  - jmcomic-zzz.one
+  - jmcomic-zzz.org
+  postman:
+    meta_data:
+      proxies: null
+  retry_times: 3
+dir_rule:
+  base_dir: D:\zc\ZC\python\JMcomic\JMF\PDF
+download:
+  cache: true
+  image:
+    suffix: .jpg
+  threading:
+    image: 20
+log: false

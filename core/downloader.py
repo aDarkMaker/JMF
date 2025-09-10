@@ -361,16 +361,44 @@ class JMcomicDownloader:
 
 def main():
     """主函数"""
-    if len(sys.argv) < 2:
-        album_id = input("请输入本子ID: ").strip()
-    else:
+    try:
+        import argparse
+        
+        parser = argparse.ArgumentParser(description='JMcomic下载器')
+        parser.add_argument('album_id', help='本子ID')
+        parser.add_argument('--config', help='配置文件路径')
+        parser.add_argument('--output', help='输出目录路径')
+        
+        args = parser.parse_args()
+        
+        album_id = args.album_id.strip()
+        if not album_id:
+            print("错误: 未提供本子ID")
+            return 1
+        
+        # 创建下载器，使用指定的配置文件
+        downloader = JMcomicDownloader(config_path=args.config)
+        
+        # 如果指定了输出目录，更新配置
+        if args.output:
+            downloader.config.output_dir = args.output
+    
+    except Exception as e:
+        # 如果argparse失败，回到原始的参数解析方式
+        print(f"参数解析错误: {e}")
+        print(f"接收到的参数: {sys.argv}")
+        
+        if len(sys.argv) < 2:
+            print("错误: 未提供本子ID")
+            return 1
+        
         album_id = sys.argv[1].strip()
-    
-    if not album_id:
-        print("错误: 未提供本子ID")
-        return 1
-    
-    downloader = JMcomicDownloader()
+        if not album_id:
+            print("错误: 未提供本子ID")
+            return 1
+        
+        # 使用默认配置
+        downloader = JMcomicDownloader()
     
     try:
         success = downloader.download_and_convert(album_id)

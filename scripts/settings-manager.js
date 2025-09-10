@@ -4,7 +4,7 @@ class SettingsManager {
         this.currentSettings = {};
         this.defaultSettings = {
             general: {
-                outputDir: '../PDF',
+                outputDir: '', // 将在初始化时设置为合适的默认路径
                 autoOpenDir: false,
                 useCustomFont: true
             },
@@ -141,7 +141,19 @@ class SettingsManager {
     async loadSettings() {
         try {
             const settings = await window.jmf.getSettings();
+
+            // 获取应用信息以设置合适的默认路径
+            const appInfo = await window.jmf.getAppInfo();
+            if (!this.defaultSettings.general.outputDir) {
+                this.defaultSettings.general.outputDir = appInfo.defaultOutputDir || appInfo.outputDir;
+            }
+
             this.currentSettings = { ...this.defaultSettings, ...settings };
+
+            // 如果没有设置输出目录，使用默认路径
+            if (!this.currentSettings.general.outputDir || this.currentSettings.general.outputDir === '../PDF') {
+                this.currentSettings.general.outputDir = this.defaultSettings.general.outputDir;
+            }
 
             // 应用字体设置
             this.applyFontSetting(this.currentSettings.general.useCustomFont);

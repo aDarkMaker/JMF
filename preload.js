@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('jmf', {
     getSettings: () => ipcRenderer.invoke('get-settings'),
     saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
     selectDirectory: () => ipcRenderer.invoke('select-directory'),
+    getAppInfo: () => ipcRenderer.invoke('get-app-info'),
 
     // 窗口控制
     win: {

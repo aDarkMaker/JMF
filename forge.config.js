@@ -20,7 +20,8 @@ module.exports = {
       /^\/node_modules\/.*\/coverage/,
       /^\/src\/.*\.ts$/,
       /^\/\.vscode/,
-      /^\/\.github/
+      /^\/\.github/,
+      /^\/settings\.json$/ // 忽略根目录的settings.json，因为会在用户数据目录创建
     ]
   },
   rebuildConfig: {},

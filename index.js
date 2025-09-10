@@ -87,9 +87,25 @@ const appDir = __dirname
 const coreDir = app.isPackaged ?
     path.join(process.resourcesPath, 'core') :
     path.join(appDir, 'core')
-const outputDir = app.isPackaged ?
+
+// 使用用户数据目录，确保可写权限
+const userDataDir = app.getPath('userData')
+const userSettingsDir = path.join(userDataDir, 'settings')
+const userOutputDir = path.join(userDataDir, 'PDF')
+
+// 设置目录 - 在打包环境中使用exe同级目录
+const settingsDir = app.isPackaged ?
+    path.join(path.dirname(process.execPath), 'settings') :
+    userSettingsDir
+
+// 默认输出目录 - 在打包环境中使用exe同级目录
+const defaultOutputDir = app.isPackaged ?
     path.join(path.dirname(process.execPath), 'PDF') :
     path.join(appDir, 'PDF')
+
+// 实际使用的输出目录（可以通过设置更改）
+let outputDir = defaultOutputDir
+
 const downloaderScript = path.join(coreDir, 'downloader.py')
 const depsScript = path.join(coreDir, 'deps.py')
 
@@ -130,6 +146,7 @@ function createWindow() {
     });
 
     ensureOutputDirectory()
+    ensureUserDirectories()
 }
 
 // 动态调整窗口大小函数
@@ -310,6 +327,93 @@ function ensureOutputDirectory() {
         }
     } catch (error) {
         console.error(`创建输出目录失败: ${error}`)
+    }
+}
+
+// 确保用户数据目录存在
+function ensureUserDirectories() {
+    try {
+        // 创建用户数据目录
+        if (!fs.existsSync(userDataDir)) {
+            fs.mkdirSync(userDataDir, { recursive: true })
+            console.log(`创建用户数据目录: ${userDataDir}`)
+        }
+
+        // 创建设置目录（根据打包状态选择不同路径）
+        if (!fs.existsSync(settingsDir)) {
+            fs.mkdirSync(settingsDir, { recursive: true })
+            console.log(`创建设置目录: ${settingsDir}`)
+        }
+
+        // 创建用户PDF目录（仅在开发环境中使用）
+        if (!app.isPackaged && !fs.existsSync(userOutputDir)) {
+            fs.mkdirSync(userOutputDir, { recursive: true })
+            console.log(`创建用户PDF目录: ${userOutputDir}`)
+        }
+
+        // 如果是首次运行打包版本，设置默认输出目录
+        if (!fs.existsSync(defaultOutputDir)) {
+            fs.mkdirSync(defaultOutputDir, { recursive: true })
+            console.log(`创建默认输出目录: ${defaultOutputDir}`)
+        }
+
+        // 运行初始化脚本来设置默认配置
+        initializeAppConfig()
+    } catch (error) {
+        console.error(`创建用户目录失败: ${error}`)
+    }
+}
+
+// 初始化应用配置
+async function initializeAppConfig() {
+    try {
+        const initScript = path.join(coreDir, 'init_app.py')
+        if (!fs.existsSync(initScript)) {
+            console.log('初始化脚本不存在，跳过配置初始化')
+            return
+        }
+
+        const py = resolvePython()
+        if (!py) {
+            console.log('未找到Python，跳过配置初始化')
+            return
+        }
+
+        const result = spawnSync(py.cmd, [...py.args, initScript], {
+            cwd: coreDir,
+            encoding: 'utf8',
+            timeout: 10000 // 10秒超时
+        })
+
+        if (result.error) {
+            console.error('配置初始化失败:', result.error)
+            return
+        }
+
+        if (result.stdout) {
+            try {
+                const initResult = JSON.parse(result.stdout)
+                if (initResult.success) {
+                    console.log('应用配置初始化完成')
+
+                    // 更新输出目录
+                    if (initResult.output_dir) {
+                        outputDir = initResult.output_dir
+                    }
+                } else {
+                    console.log('配置初始化未成功')
+                }
+            } catch (e) {
+                console.log('配置初始化输出:', result.stdout)
+            }
+        }
+
+        if (result.stderr) {
+            console.error('配置初始化警告:', result.stderr)
+        }
+
+    } catch (error) {
+        console.error('配置初始化异常:', error)
     }
 }
 
@@ -524,7 +628,25 @@ ipcMain.on('download', async (event, albumId) => {
             }
         }
 
-        const child = spawn(py.cmd, [...py.args, downloaderScript, String(albumId)], {
+        // 使用正确的设置目录中的配置文件（如果存在）
+        const userConfigPath = path.join(settingsDir, 'option.yml')
+        const configToUse = fs.existsSync(userConfigPath) ? userConfigPath : path.join(coreDir, 'option.yml')
+
+        // 构建命令行参数，确保路径正确引用
+        const args = [...py.args, downloaderScript, String(albumId)]
+        if (configToUse) {
+            args.push('--config', configToUse)
+        }
+        if (outputDir) {
+            args.push('--output', outputDir)
+        }
+
+        console.log('Python命令:', py.cmd)
+        console.log('完整参数:', args)
+        console.log('配置文件路径:', configToUse)
+        console.log('输出目录:', outputDir)
+
+        const child = spawn(py.cmd, args, {
             cwd: coreDir,
             env: spawnEnv,
             windowsHide: true,
@@ -845,7 +967,8 @@ ipcMain.handle('notify-pdf-font-change', async (event, useCustomFont) => {
 ipcMain.handle('get-settings', async () => {
     try {
         const configPath = path.join(coreDir, 'option.yml')
-        const settingsPath = path.join(appDir, 'settings.json')
+        // 使用统一的设置目录
+        const settingsPath = path.join(settingsDir, 'settings.json')
 
         let settings = {
             general: {
@@ -889,6 +1012,11 @@ ipcMain.handle('get-settings', async () => {
         if (fs.existsSync(settingsPath)) {
             const appSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'))
             settings = { ...settings, ...appSettings }
+
+            // 如果设置中有输出目录，更新全局输出目录
+            if (appSettings.general && appSettings.general.outputDir) {
+                outputDir = appSettings.general.outputDir
+            }
         }
 
         return settings
@@ -902,13 +1030,28 @@ ipcMain.handle('get-settings', async () => {
 ipcMain.handle('save-settings', async (event, settings) => {
     try {
         const configPath = path.join(coreDir, 'option.yml')
-        const settingsPath = path.join(appDir, 'settings.json')
+        // 使用统一的设置目录
+        const settingsPath = path.join(settingsDir, 'settings.json')
 
-        // 更新option.yml
+        // 在打包环境中，option.yml可能在只读的资源目录中，需要复制到设置目录
+        const userConfigPath = path.join(settingsDir, 'option.yml')        // 更新option.yml
         let config = {}
-        if (fs.existsSync(configPath)) {
-            const configContent = fs.readFileSync(configPath, 'utf8')
+
+        // 优先读取用户数据目录中的配置文件
+        if (fs.existsSync(userConfigPath)) {
+            const configContent = fs.readFileSync(userConfigPath, 'utf8')
             config = parseYAML(configContent) || {}
+        } else if (fs.existsSync(configPath)) {
+            // 如果用户数据目录中没有，从资源目录复制一份
+            try {
+                const configContent = fs.readFileSync(configPath, 'utf8')
+                config = parseYAML(configContent) || {}
+                // 复制到用户数据目录
+                fs.writeFileSync(userConfigPath, configContent, 'utf8')
+            } catch (error) {
+                console.log('无法复制配置文件，使用默认配置')
+                config = {}
+            }
         }
 
         // 应用下载设置到option.yml
@@ -948,16 +1091,20 @@ ipcMain.handle('save-settings', async (event, settings) => {
             }
         }
 
-        // 写入option.yml
-        fs.writeFileSync(configPath, generateYAML(config), 'utf8')
+        // 写入用户数据目录中的option.yml
+        try {
+            fs.writeFileSync(userConfigPath, generateYAML(config), 'utf8')
+        } catch (error) {
+            console.error('保存配置文件失败:', error)
+        }
 
-        // 保存应用设置
+        // 保存应用设置到用户数据目录
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8')
 
         // 更新输出目录
         if (settings.general && settings.general.outputDir) {
-            // 这里可以考虑重新创建输出目录
-            // 但需要谨慎处理，避免丢失现有文件
+            outputDir = settings.general.outputDir
+            ensureOutputDirectory()
         }
 
         return { success: true }
@@ -1016,6 +1163,10 @@ ipcMain.handle('get-app-info', () => {
         platform: process.platform,
         arch: process.arch,
         coreDir: coreDir,
-        outputDir: outputDir
+        outputDir: outputDir,
+        settingsDir: settingsDir,
+        userDataDir: userDataDir,
+        defaultOutputDir: defaultOutputDir,
+        isPackaged: app.isPackaged
     }
 })
