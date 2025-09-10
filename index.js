@@ -1,4 +1,3 @@
-// Electron main process: create window, wire IPC, and run Python script
 const { app, BrowserWindow, ipcMain, shell } = require('electron')
 const path = require('path')
 const { spawn, spawnSync } = require('child_process')
@@ -28,23 +27,17 @@ function createWindow() {
             sandbox: false,
         },
         icon: path.join(__dirname, 'assets', 'icon', 'icon.png'),
-        show: false, // 先隐藏，加载完成后显示
+        show: false
     })
 
     mainWindow.loadFile(path.join(__dirname, 'index.html'))
 
-    // 窗口加载完成后显示
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
-
-        // 可选：开发时打开开发者工具
-        // mainWindow.webContents.openDevTools()
     })
 
-    // 移除默认菜单
     mainWindow.setMenuBarVisibility(false)
 
-    // 确保输出目录存在
     ensureOutputDirectory()
 }
 
@@ -60,7 +53,6 @@ function ensureOutputDirectory() {
 }
 
 function resolvePython() {
-    // Try Windows launcher first, then common names
     const candidates = [
         { cmd: 'py', args: ['-3'] },
         { cmd: 'py', args: [] },
@@ -76,15 +68,12 @@ function resolvePython() {
                 windowsHide: true
             })
             if (r.status === 0 && r.stdout && r.stdout.includes('Python')) {
-                console.log(`找到Python解释器: ${c.cmd} ${c.args.join(' ')} - ${r.stdout.trim()}`)
                 return c
             }
         } catch (error) {
-            // ignore and try next
         }
     }
 
-    console.error('未找到可用的Python解释器')
     return null
 }
 
@@ -122,14 +111,12 @@ app.on('window-all-closed', () => {
     }
 })
 
-// 防止多实例运行
 const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
     app.quit()
 } else {
     app.on('second-instance', () => {
-        // 当运行第二个实例时，将焦点转移到主窗口
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore()
             mainWindow.focus()
@@ -137,7 +124,6 @@ if (!gotTheLock) {
     })
 }
 
-// Window controls
 ipcMain.on('win:minimize', () => {
     mainWindow?.minimize()
 })
@@ -155,7 +141,6 @@ ipcMain.on('win:close', () => {
     mainWindow?.close()
 })
 
-// Start download: spawn Python downloader.py <albumId>
 ipcMain.on('download', async (event, albumId) => {
     const py = resolvePython()
     if (!py) {
@@ -163,7 +148,6 @@ ipcMain.on('download', async (event, albumId) => {
         return
     }
 
-    // 验证下载脚本存在
     if (!fs.existsSync(downloaderScript)) {
         event.sender.send('download-error', `下载脚本不存在: ${downloaderScript}`)
         return
@@ -171,18 +155,18 @@ ipcMain.on('download', async (event, albumId) => {
 
     try {
         const child = spawn(py.cmd, [...py.args, downloaderScript, String(albumId)], {
-            cwd: coreDir, // 在core目录中运行
+            cwd: coreDir,
             env: {
                 ...process.env,
-                PYTHONPATH: coreDir, // 添加core目录到Python路径
-                PYTHONIOENCODING: 'utf-8', // 确保输出编码
-                PYTHONUTF8: '1', // 强制使用UTF-8
-                LC_ALL: 'zh_CN.UTF-8', // 设置地区
+                PYTHONPATH: coreDir,
+                PYTHONIOENCODING: 'utf-8',
+                PYTHONUTF8: '1',
+                LC_ALL: 'zh_CN.UTF-8',
                 LANG: 'zh_CN.UTF-8'
             },
             windowsHide: true,
             encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'] // 明确设置stdio
+            stdio: ['ignore', 'pipe', 'pipe']
         })
 
         streamChild(child, event)
@@ -200,7 +184,6 @@ ipcMain.on('download', async (event, albumId) => {
     }
 })
 
-// Install Python dependencies
 ipcMain.handle('install-deps', async () => {
     const py = resolvePython()
     if (!py) {
@@ -211,7 +194,6 @@ ipcMain.handle('install-deps', async () => {
     }
 
     return new Promise((resolve) => {
-        // 先尝试使用deps.py脚本
         if (fs.existsSync(depsScript)) {
             const child = spawn(py.cmd, [...py.args, depsScript], {
                 cwd: coreDir,
