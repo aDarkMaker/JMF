@@ -23,4 +23,4 @@ download:
   threading:
     image: 20
     photo: 8
-log: true
+log: false

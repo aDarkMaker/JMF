@@ -98,6 +98,7 @@ body.font-fallback::before {
 }
 
 .titlebar .title {
+  font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-secondary);
   font-weight: 500;
@@ -107,37 +108,37 @@ body.font-fallback::before {
 .titlebar .right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   -webkit-app-region: no-drag;
 }
 
 .window-btn {
-  width: 32px;
-  height: 28px;
+  width: 36px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  border-radius: 8px;
+  border: none;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 11px;
-  background: rgba(255, 255, 255, 0.02);
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .window-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--border-hover);
-  transform: translateY(-1px);
-}
-
-.window-btn.close {
-  border-color: rgba(255, 107, 107, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  transform: scale(1.05);
 }
 
 .window-btn.close:hover {
-  background: rgba(255, 107, 107, 0.15);
-  border-color: rgba(255, 107, 107, 0.6);
+  background: #ff5f56;
+  color: white;
+}
+
+.window-btn svg {
+  transition: all 0.2s ease;
 }
 
 /* 主容器 */
@@ -223,6 +224,7 @@ body.font-fallback::before {
 
 .hint {
   color: var(--muted);
+  font-family: var(--font-ui);
   font-size: 13px;
 }
 

@@ -172,7 +172,6 @@ class JMcomicDownloader:
         if not self.setup_domains():
             print("警告: 域名配置失败，使用默认配置")
         
-        print(f"开始下载本子: {album_id}")
         print(f"使用域名: {', '.join(self.config.domains[:3])}...")
         
         try:
@@ -211,8 +210,6 @@ class JMcomicDownloader:
             print(f"图片目录不存在: {img_dir}")
             return False
         
-        print(f"开始转换PDF: {img_dir} -> {pdf_path}")
-        
         # 支持的图片格式
         supported_formats = ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif']
         images = []
@@ -229,7 +226,6 @@ class JMcomicDownloader:
         
         # 自然排序
         images = natsorted(images)
-        print(f"找到 {len(images)} 张图片")
         
         # 创建PDF
         pdf = FPDF(unit="pt")
@@ -237,7 +233,6 @@ class JMcomicDownloader:
         
         try:
             for i, img_path in enumerate(images):
-                print(f"处理图片 {i+1}/{len(images)}: {os.path.basename(img_path)}")
                 
                 try:
                     with Image.open(img_path) as img:
@@ -310,10 +305,8 @@ class JMcomicDownloader:
                 try:
                     if os.path.isdir(path):
                         shutil.rmtree(path)
-                        print(f"已清理临时目录: {path}")
                     else:
                         os.remove(path)
-                        print(f"已清理临时文件: {path}")
                 except Exception as e:
                     print(f"清理失败 {path}: {e}")
     
@@ -382,7 +375,6 @@ def main():
     try:
         success = downloader.download_and_convert(album_id)
         if success:
-            print("✅ 完成!")
             return 0
         else:
             print("❌ 失败!")

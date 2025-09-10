@@ -17,9 +17,21 @@
         <span class="title">JMcomic Fetcher</span>
       </div>
       <div class="right">
-        <div id="btnMin" class="window-btn" title="最小化">−</div>
-        <div id="btnMax" class="window-btn" title="最大化">⬜</div>
-        <div id="btnClose" class="window-btn close" title="关闭">✕</div>
+        <div id="btnMin" class="window-btn" title="最小化">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="2" y="5.5" width="8" height="1" fill="currentColor"/>
+          </svg>
+        </div>
+        <div id="btnMax" class="window-btn" title="最大化">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="2" y="2" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+        </div>
+        <div id="btnClose" class="window-btn close" title="关闭">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+        </div>
       </div>
     </div>
 
@@ -42,7 +54,7 @@
               id="albumId" 
               type="text" 
               class="input-field" 
-              placeholder="输入本子ID，如 123456" 
+              placeholder="输入本子ID即可" 
               maxlength="20"
             />
           </div>
