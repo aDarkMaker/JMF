@@ -3,14 +3,35 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
 module.exports = {
   packagerConfig: {
-    asar: true,
-    icon: './assets/icon/icon.ico'
+    asar: {
+      unpack: "core/**/*" // 确保core目录不被打包到asar中，以便Python脚本可以正常访问
+    },
+    icon: './assets/icon/icon.ico',
+    extraResource: [
+      "./core", // 将core目录作为额外资源包含
+      "./PDF"   // 确保PDF输出目录存在
+    ],
+    // 忽略不必要的文件以减小包大小
+    ignore: [
+      /^\/\.git/,
+      /^\/node_modules\/.*\/test/,
+      /^\/node_modules\/.*\/tests/,
+      /^\/node_modules\/.*\/\.nyc_output/,
+      /^\/node_modules\/.*\/coverage/,
+      /^\/src\/.*\.ts$/,
+      /^\/\.vscode/,
+      /^\/\.github/
+    ]
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        name: "JMcomic_Fetcher",
+        setupIcon: './assets/icon/icon.ico',
+        loadingGif: './assets/icon/icon.png'
+      },
     },
     {
       name: '@electron-forge/maker-zip',
@@ -20,13 +41,25 @@ module.exports = {
       name: '@electron-forge/maker-deb',
       config: {
         options: {
-          icon: './assets/icon/icon.png'
+          icon: './assets/icon/icon.png',
+          name: 'jmcomic-fetcher',
+          productName: 'JMcomic Fetcher',
+          maintainer: 'Orange',
+          description: 'JMcomic漫画下载工具'
         }
       },
     },
     {
       name: '@electron-forge/maker-rpm',
-      config: {},
+      config: {
+        options: {
+          icon: './assets/icon/icon.png',
+          name: 'jmcomic-fetcher',
+          productName: 'JMcomic Fetcher',
+          maintainer: 'Orange',
+          description: 'JMcomic漫画下载工具'
+        }
+      },
     },
   ],
   plugins: [

@@ -83,8 +83,13 @@ function generateYAML(obj, indent = 0) {
 let mainWindow
 
 const appDir = __dirname
-const coreDir = path.join(appDir, 'core')
-const outputDir = path.join(appDir, 'PDF')
+// 在打包环境中，资源文件的路径会有所不同
+const coreDir = app.isPackaged ?
+    path.join(process.resourcesPath, 'core') :
+    path.join(appDir, 'core')
+const outputDir = app.isPackaged ?
+    path.join(path.dirname(process.execPath), 'PDF') :
+    path.join(appDir, 'PDF')
 const downloaderScript = path.join(coreDir, 'downloader.py')
 const depsScript = path.join(coreDir, 'deps.py')
 
@@ -316,18 +321,83 @@ function resolvePython() {
         { cmd: 'python3', args: [] },
     ]
 
+    // 在打包环境中添加常见的Python安装路径
+    const commonPaths = [
+        'C:\\Python39\\python.exe',
+        'C:\\Python310\\python.exe',
+        'C:\\Python311\\python.exe',
+        'C:\\Python312\\python.exe',
+        'C:\\Python313\\python.exe',
+        'C:\\Users\\' + (process.env.USERNAME || 'user') + '\\AppData\\Local\\Programs\\Python\\Python39\\python.exe',
+        'C:\\Users\\' + (process.env.USERNAME || 'user') + '\\AppData\\Local\\Programs\\Python\\Python310\\python.exe',
+        'C:\\Users\\' + (process.env.USERNAME || 'user') + '\\AppData\\Local\\Programs\\Python\\Python311\\python.exe',
+        'C:\\Users\\' + (process.env.USERNAME || 'user') + '\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
+        'C:\\Users\\' + (process.env.USERNAME || 'user') + '\\AppData\\Local\\Programs\\Python\\Python313\\python.exe',
+    ]
+
+    // 添加常见路径到候选列表
+    for (const pythonPath of commonPaths) {
+        if (fs.existsSync(pythonPath)) {
+            candidates.push({ cmd: pythonPath, args: [] })
+        }
+    }
+
+    // 日志输出
+    console.log('开始检测系统Python环境...')
+    console.log('运行环境:', app.isPackaged ? '打包环境' : '开发环境')
+
     for (const c of candidates) {
         try {
-            const r = spawnSync(c.cmd, [...c.args, '--version'], {
+            console.log(`尝试检测Python命令: ${c.cmd} ${c.args.join(' ')}`)
+
+            // 在打包环境中使用更宽松的配置
+            const spawnOptions = {
                 encoding: 'utf8',
-                timeout: 5000,
-                windowsHide: true
-            })
-            if (r.status === 0 && r.stdout && r.stdout.includes('Python')) {
+                timeout: app.isPackaged ? 10000 : 5000, // 打包环境给更长时间
+                windowsHide: true,
+                shell: true
+            }
+
+            // 在打包环境中添加更多环境变量
+            if (app.isPackaged) {
+                spawnOptions.env = {
+                    ...process.env,
+                    PATH: process.env.PATH + ';C:\\Python39;C:\\Python310;C:\\Python311;C:\\Python312;C:\\Python313;C:\\Windows\\py.exe',
+                    PYTHONPATH: '',
+                    PYTHONHOME: ''
+                }
+            }
+
+            const r = spawnSync(c.cmd, [...c.args, '--version'], spawnOptions)
+
+            // 详细日志
+            if (r.error) {
+                console.log(`命令执行出错: ${r.error.message}`)
+            } else {
+                console.log(`命令状态码: ${r.status}`)
+                console.log(`命令标准输出: ${r.stdout?.trim()}`)
+                console.log(`命令错误输出: ${r.stderr?.trim()}`)
+            }
+
+            // 检查结果
+            if (r.status === 0 && (r.stdout?.includes('Python') || r.stderr?.includes('Python'))) {
+                console.log(`√ 成功找到Python解释器: ${c.cmd} ${c.args.join(' ')}`)
                 return c
             }
         } catch (error) {
+            console.log(`× 检测Python命令失败 [${c.cmd}]: ${error.message}`)
         }
+    }
+
+    console.log('× 未找到可用的Python解释器')
+    console.log('提示: 请确保已安装Python 3.7+并且可以在命令行中运行')
+
+    // 在打包环境中提供更详细的错误信息
+    if (app.isPackaged) {
+        console.log('打包环境中的Python检测失败，可能的解决方案:')
+        console.log('1. 确保Python已正确安装在系统PATH中')
+        console.log('2. 尝试重新安装Python，确保勾选"Add Python to PATH"选项')
+        console.log('3. 重启计算机以确保环境变量生效')
     }
 
     return null
@@ -414,7 +484,7 @@ ipcMain.handle('request-window-resize', async () => {
 ipcMain.on('download', async (event, albumId) => {
     const py = resolvePython()
     if (!py) {
-        event.sender.send('download-error', '未找到可用的 Python 解释器。\n请安装 Python 3.7+ 并确保其在系统 PATH 中。')
+        event.sender.send('download-error', '未找到可用的 Python 解释器。\n请安装 Python 3.7+ 并确保其在系统 PATH 中。\n\n如果已安装Python，请尝试:\n1. 重新安装Python并勾选"Add Python to PATH"\n2. 重启计算机\n3. 以管理员身份运行此应用')
         return
     }
 
@@ -424,19 +494,43 @@ ipcMain.on('download', async (event, albumId) => {
     }
 
     try {
+        // 准备spawn环境变量，特别适配打包环境
+        const spawnEnv = {
+            ...process.env,
+            PYTHONPATH: coreDir,
+            PYTHONIOENCODING: 'utf-8',
+            PYTHONUTF8: '1',
+            LC_ALL: 'zh_CN.UTF-8',
+            LANG: 'zh_CN.UTF-8'
+        }
+
+        // 在打包环境中增强PATH
+        if (app.isPackaged) {
+            const additionalPaths = [
+                'C:\\Python39',
+                'C:\\Python310',
+                'C:\\Python311',
+                'C:\\Python312',
+                'C:\\Python313',
+                'C:\\Python39\\Scripts',
+                'C:\\Python310\\Scripts',
+                'C:\\Python311\\Scripts',
+                'C:\\Python312\\Scripts',
+                'C:\\Python313\\Scripts'
+            ].filter(p => fs.existsSync(p)).join(';')
+
+            if (additionalPaths) {
+                spawnEnv.PATH = `${spawnEnv.PATH};${additionalPaths}`
+            }
+        }
+
         const child = spawn(py.cmd, [...py.args, downloaderScript, String(albumId)], {
             cwd: coreDir,
-            env: {
-                ...process.env,
-                PYTHONPATH: coreDir,
-                PYTHONIOENCODING: 'utf-8',
-                PYTHONUTF8: '1',
-                LC_ALL: 'zh_CN.UTF-8',
-                LANG: 'zh_CN.UTF-8'
-            },
+            env: spawnEnv,
             windowsHide: true,
             encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe']
+            stdio: ['ignore', 'pipe', 'pipe'],
+            shell: true // 确保在shell中执行，这在打包环境中很重要
         })
 
         streamChild(child, event)
@@ -446,38 +540,85 @@ ipcMain.on('download', async (event, albumId) => {
         })
 
         child.on('error', (err) => {
-            event.sender.send('download-error', `Python进程错误: ${String(err)}`)
+            console.error('Python进程启动错误:', err)
+            const errorMsg = app.isPackaged ?
+                `Python进程错误: ${String(err)}\n\n这可能是由于Python环境配置问题导致的。\n建议:\n1. 确保Python已正确安装\n2. 重新安装Python并勾选"Add Python to PATH"\n3. 重启计算机\n4. 以管理员身份运行此应用` :
+                `Python进程错误: ${String(err)}`
+            event.sender.send('download-error', errorMsg)
         })
 
     } catch (err) {
-        event.sender.send('download-error', `启动下载进程失败: ${String(err)}`)
+        console.error('启动下载进程失败:', err)
+        const errorMsg = app.isPackaged ?
+            `启动下载进程失败: ${String(err)}\n\n请检查Python环境是否正确安装。` :
+            `启动下载进程失败: ${String(err)}`
+        event.sender.send('download-error', errorMsg)
     }
 })
 
 ipcMain.handle('install-deps', async () => {
+    console.log('开始安装Python依赖...')
+    console.log('运行环境:', app.isPackaged ? '打包环境' : '开发环境')
+
+    // 检测Python
     const py = resolvePython()
     if (!py) {
+        console.log('× Python解释器检测失败')
+        const errorMessage = app.isPackaged ?
+            '未找到 Python 解释器，无法安装依赖。\n请先安装 Python 3.7+ 并确保其在系统 PATH 中。\n\n解决步骤:\n1. 下载并安装Python (https://python.org)\n2. 安装时务必勾选 "Add Python to PATH" 选项\n3. 重启计算机以应用环境变量更改\n4. 以管理员身份重新运行此应用' :
+            '未找到 Python 解释器，无法安装依赖。\n请先安装 Python 3.7+ 并确保其在系统 PATH 中。\n\n提示：可能需要重启电脑以应用PATH环境变量更改。'
         return {
             ok: false,
-            message: '未找到 Python 解释器，无法安装依赖。\n请先安装 Python 3.7+ 并确保其在系统 PATH 中。'
+            message: errorMessage
         }
     }
 
+    console.log(`√ 使用Python解释器: ${py.cmd} ${py.args.join(' ')}`)
+
     return new Promise((resolve) => {
+        // 准备环境变量
+        const spawnEnv = {
+            ...process.env,
+            PYTHONPATH: coreDir,
+            PYTHONIOENCODING: 'utf-8',
+            PYTHONUTF8: '1',
+            LC_ALL: 'zh_CN.UTF-8',
+            LANG: 'zh_CN.UTF-8'
+        }
+
+        // 在打包环境中增强PATH
+        if (app.isPackaged) {
+            const additionalPaths = [
+                'C:\\Python39',
+                'C:\\Python310',
+                'C:\\Python311',
+                'C:\\Python312',
+                'C:\\Python313',
+                'C:\\Python39\\Scripts',
+                'C:\\Python310\\Scripts',
+                'C:\\Python311\\Scripts',
+                'C:\\Python312\\Scripts',
+                'C:\\Python313\\Scripts'
+            ].filter(p => fs.existsSync(p)).join(';')
+
+            if (additionalPaths) {
+                spawnEnv.PATH = `${spawnEnv.PATH};${additionalPaths}`
+            }
+        }
+
+        // 检查依赖安装脚本
         if (fs.existsSync(depsScript)) {
+            console.log(`√ 找到依赖安装脚本: ${depsScript}`)
+
+            // 执行依赖安装脚本
+            console.log(`执行命令: ${py.cmd} ${[...py.args, depsScript].join(' ')}`)
             const child = spawn(py.cmd, [...py.args, depsScript], {
                 cwd: coreDir,
-                env: {
-                    ...process.env,
-                    PYTHONPATH: coreDir,
-                    PYTHONIOENCODING: 'utf-8',
-                    PYTHONUTF8: '1',
-                    LC_ALL: 'zh_CN.UTF-8',
-                    LANG: 'zh_CN.UTF-8'
-                },
+                env: spawnEnv,
                 windowsHide: true,
                 encoding: 'utf8',
-                stdio: ['ignore', 'pipe', 'pipe']
+                stdio: ['ignore', 'pipe', 'pipe'],
+                shell: true  // 在打包环境中很重要
             })
 
             let output = ''
@@ -498,12 +639,18 @@ ipcMain.handle('install-deps', async () => {
                 if (code === 0) {
                     resolve({ ok: true, message: '依赖安装完成', output })
                 } else {
-                    resolve({ ok: false, message: `依赖安装失败 (退出码: ${code})`, output })
+                    const errorMessage = app.isPackaged ?
+                        `依赖安装失败 (退出码: ${code})\n\n可能的解决方案:\n1. 以管理员身份运行此应用\n2. 检查网络连接\n3. 手动安装依赖: pip install -r requirements.txt` :
+                        `依赖安装失败 (退出码: ${code})`
+                    resolve({ ok: false, message: errorMessage, output })
                 }
             })
 
             child.on('error', (err) => {
-                resolve({ ok: false, message: `依赖安装进程错误: ${String(err)}` })
+                const errorMessage = app.isPackaged ?
+                    `依赖安装进程错误: ${String(err)}\n\n建议以管理员身份运行应用，或手动安装Python依赖。` :
+                    `依赖安装进程错误: ${String(err)}`
+                resolve({ ok: false, message: errorMessage })
             })
         } else {
             // 回退到直接pip安装
@@ -515,24 +662,25 @@ ipcMain.handle('install-deps', async () => {
 
             const child = spawn(py.cmd, [...py.args, '-m', 'pip', 'install', '-r', requirementsFile, '--upgrade'], {
                 cwd: coreDir,
-                env: {
-                    ...process.env,
-                    PYTHONIOENCODING: 'utf-8',
-                    PYTHONUTF8: '1',
-                    LC_ALL: 'zh_CN.UTF-8',
-                    LANG: 'zh_CN.UTF-8'
-                },
+                env: spawnEnv,
                 windowsHide: true,
                 encoding: 'utf8',
-                stdio: ['ignore', 'pipe', 'pipe']
+                stdio: ['ignore', 'pipe', 'pipe'],
+                shell: true
             })
 
             child.on('close', (code) => {
-                resolve({ ok: code === 0, code })
+                const message = code === 0 ? '依赖安装完成' :
+                    app.isPackaged ? `依赖安装失败 (退出码: ${code})\n建议以管理员身份运行或手动安装依赖` :
+                        `依赖安装失败 (退出码: ${code})`
+                resolve({ ok: code === 0, message, code })
             })
 
             child.on('error', (err) => {
-                resolve({ ok: false, message: String(err) })
+                const errorMessage = app.isPackaged ?
+                    `${String(err)}\n建议以管理员身份运行应用` :
+                    String(err)
+                resolve({ ok: false, message: errorMessage })
             })
         }
     })
