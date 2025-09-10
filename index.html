@@ -104,37 +104,6 @@
       </div>
     </div>
 
-    <!-- PDF预览模态框 -->
-    <div id="pdfModal" class="modal" style="display: none;">
-      <div class="modal-content pdf-viewer">
-        <div class="modal-header">
-          <h3>PDF预览</h3>
-          <button id="closePdfModal" class="btn close-btn">✕</button>
-        </div>
-        <div class="pdf-controls">
-          <select id="pdfFileSelect" class="pdf-select">
-            <option value="">选择PDF文件</option>
-          </select>
-          <div class="pdf-nav">
-            <button id="prevPage" class="btn" disabled>上一页</button>
-            <span id="pageInfo">页 1 / 1</span>
-            <button id="nextPage" class="btn" disabled>下一页</button>
-          </div>
-          <div class="pdf-zoom">
-            <button id="zoomOut" class="btn">缩小</button>
-            <span id="zoomLevel">100%</span>
-            <button id="zoomIn" class="btn">放大</button>
-          </div>
-        </div>
-        <div id="pdfContainer" class="pdf-container">
-          <div class="pdf-placeholder">
-            <span>📄</span>
-            <p>请选择PDF文件进行预览</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- 设置模态框 -->
     <div id="settingsModal" class="modal" style="display: none;">
       <div class="modal-content settings-panel">
@@ -160,6 +129,23 @@
           <div class="setting-group">
             <label>自动打开输出目录</label>
             <input type="checkbox" id="autoOpenDir" />
+          </div>
+          <div class="setting-group">
+            <label>字体设置</label>
+            <div class="font-options">
+              <div id="customFontOption" class="font-option">
+                <div class="font-name">预设字体</div>
+                <div class="font-preview custom">预览文字 ABC 123 测试字体效果</div>
+                <div class="font-check"></div>
+              </div>
+              <div id="systemFontOption" class="font-option">
+                <div class="font-name">系统字体</div>
+                <div class="font-preview system">预览文字 ABC 123 测试字体效果</div>
+                <div class="font-check"></div>
+              </div>
+            </div>
+            <input type="checkbox" id="useCustomFont" style="display: none;" />
+            <div class="setting-description">点击切换预设字体或系统默认字体</div>
           </div>
         </div>
 
@@ -219,7 +205,6 @@
     </div>
 
     <!-- JavaScript -->
-    <script src="./scripts/pdf-viewer.js"></script>
     <script src="./scripts/settings-manager.js"></script>
     <script src="./scripts/app.js"></script>
   </body>

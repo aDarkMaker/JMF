@@ -8,7 +8,7 @@
     function preloadCustomFont() {
         const fontFace = new FontFace(
             'Custom-UI',
-            'url(./assets/fonts/AaGuXiLaZhangGuanKeAiDeShen-2.ttf)',
+            'url(../assets/fonts/AaGuXiLaZhangGuanKeAiDeShen-2.ttf)',
             {
                 weight: 'normal',
                 style: 'normal',
@@ -22,6 +22,7 @@
 
             // 触发字体变更事件
             document.body.classList.add('font-loaded');
+            document.body.classList.add('custom-font');
         }).catch(function (error) {
             console.warn('⚠️ 自定义字体加载失败，使用系统字体:', error);
             // 降级到系统字体

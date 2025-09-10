@@ -374,15 +374,17 @@ class JMcomicApp {
     }
 
     // 处理PDF预览
-    handlePDFPreview() {
-        if (window.pdfViewer) {
-            window.pdfViewer.show();
-        } else {
-            this.showNotification('PDF预览功能不可用', 'error');
-        }
-    }
+    async handlePDFPreview() {
+        try {
+            // 直接打开新的PDF预览器窗口
+            await window.jmf?.openPDFInNewWindow();
+            this.appendLog('📖 PDF预览器已打开\n');
 
-    // 处理设置
+        } catch (error) {
+            this.showNotification('PDF预览出错', 'error');
+            this.appendLog(`❌ PDF预览出错: ${error}\n`, 'error');
+        }
+    }    // 处理设置
     handleSettings() {
         if (window.settingsManager) {
             window.settingsManager.show();

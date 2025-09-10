@@ -89,10 +89,9 @@ const downloaderScript = path.join(coreDir, 'downloader.py')
 const depsScript = path.join(coreDir, 'deps.py')
 
 function createWindow() {
-    // 先创建一个隐藏的窗口来测量内容大小
     mainWindow = new BrowserWindow({
-        width: 1000,
-        height: 720,
+        width: 1400,
+        height: 1000,
         minWidth: 900,
         minHeight: 600,
         title: 'JMcomic Fetcher',
@@ -117,6 +116,13 @@ function createWindow() {
     })
 
     mainWindow.setMenuBarVisibility(false)
+
+    // 当主窗口关闭时，关闭所有子窗口（包括PDF预览窗口）
+    mainWindow.on('close', () => {
+        if (pdfViewerWindow && !pdfViewerWindow.isDestroyed()) {
+            pdfViewerWindow.close();
+        }
+    });
 
     ensureOutputDirectory()
 }
@@ -157,7 +163,7 @@ async function adjustWindowSize() {
                                 totalContentHeight += inputSection.offsetHeight + 20; // input section + margin
                             }
                             
-                            if (progressBar && progressBar.style.display !== 'none') {
+                            if (progressBar && getComputedStyle(progressBar).display !== 'none') {
                                 totalContentHeight += progressBar.offsetHeight + 20; // progress bar + margin
                             }
                             
@@ -216,8 +222,8 @@ async function adjustWindowSize() {
                             
                             // 计算理想宽度
                             const cardRect = mainCard.getBoundingClientRect();
-                            const idealWidth = Math.max(900, Math.min(1200, cardRect.width + containerPadding + 40));
-                            const idealHeight = Math.max(600, Math.min(1100, idealWindowHeight));
+                            const idealWidth = Math.max(1200, Math.min(1600, cardRect.width + containerPadding + 40));
+                            const idealHeight = Math.max(800, Math.min(1200, idealWindowHeight));
                             
                             resolve({
                                 width: idealWidth,
@@ -551,29 +557,143 @@ ipcMain.handle('open-outdir', async () => {
     }
 })
 
-// 获取PDF文件列表
+// PDF预览功能
 ipcMain.handle('get-pdf-list', async () => {
     try {
-        ensureOutputDirectory()
-
-        const files = fs.readdirSync(outputDir)
+        ensureOutputDirectory();
+        const files = fs.readdirSync(outputDir);
+        const pdfFiles = files
             .filter(file => file.toLowerCase().endsWith('.pdf'))
-            .map(file => ({
-                name: file,
-                path: path.join(outputDir, file),
-                size: fs.statSync(path.join(outputDir, file)).size,
-                created: fs.statSync(path.join(outputDir, file)).birthtime
-            }))
-            .sort((a, b) => b.created - a.created) // 按创建时间倒序
-
-        return files
+            .map(file => {
+                const filePath = path.join(outputDir, file);
+                const stat = fs.statSync(filePath);
+                return {
+                    name: path.basename(file, '.pdf'),
+                    path: filePath,
+                    size: stat.size,
+                    created: stat.birthtime,
+                };
+            })
+            .sort((a, b) => b.created - a.created); // 按创建时间降序排序
+        return pdfFiles;
     } catch (error) {
-        console.error('获取PDF列表失败:', error)
-        return []
+        console.error('无法读取PDF目录:', error);
+        return [];
     }
-})
+});
 
-// 获取设置
+ipcMain.handle('open-pdf-external', async (event, filePath) => {
+    try {
+        await shell.openPath(filePath);
+        return { success: true };
+    } catch (error) {
+        console.error(`无法打开外部PDF: ${filePath}`, error);
+        return { success: false, error: error.message };
+    }
+});
+
+// 保存PDF预览窗口的引用
+let pdfViewerWindow = null;
+
+ipcMain.handle('open-pdf-in-new-window', () => {
+    // 如果已经存在PDF窗口，先关闭它
+    if (pdfViewerWindow && !pdfViewerWindow.isDestroyed()) {
+        pdfViewerWindow.close();
+    }
+
+    // 创建新的PDF预览窗口
+    pdfViewerWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        title: 'PDF 查看器',
+        frame: false, // 禁用默认的系统标题栏
+        titleBarStyle: 'hidden',
+        transparent: false,
+        backgroundColor: '#0a0b0f', // 与CSS中的--bg变量相匹配
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+            sandbox: false,
+            webSecurity: false, // 允许加载本地文件
+        },
+        icon: path.join(__dirname, 'assets', 'icon', 'icon.png'),
+    });
+
+    pdfViewerWindow.loadFile(path.join(__dirname, 'pdf-viewer.html'));
+    pdfViewerWindow.setMenuBarVisibility(false);
+
+    // 添加窗口关闭事件处理
+    pdfViewerWindow.on('closed', () => {
+        pdfViewerWindow = null;
+    });
+
+    // 打开开发者工具以便于调试
+    if (process.env.NODE_ENV === 'development') {
+        pdfViewerWindow.webContents.openDevTools();
+    }
+
+    console.log('PDF 预览窗口已打开');
+    return true;
+});
+
+// PDF窗口控制事件
+ipcMain.on('pdf-win:minimize', () => {
+    if (pdfViewerWindow && !pdfViewerWindow.isDestroyed()) {
+        pdfViewerWindow.minimize();
+    }
+});
+
+ipcMain.on('pdf-win:toggle-maximize', () => {
+    if (!pdfViewerWindow || pdfViewerWindow.isDestroyed()) return;
+
+    if (pdfViewerWindow.isMaximized()) {
+        pdfViewerWindow.unmaximize();
+    } else {
+        pdfViewerWindow.maximize();
+    }
+});
+
+ipcMain.on('pdf-win:close', () => {
+    if (pdfViewerWindow && !pdfViewerWindow.isDestroyed()) {
+        pdfViewerWindow.close();
+    }
+});
+
+// 读取PDF文件内容
+ipcMain.handle('read-pdf-file', async (event, filePath) => {
+    try {
+        console.log(`读取PDF文件: ${filePath}`);
+        if (!fs.existsSync(filePath)) {
+            throw new Error(`文件不存在: ${filePath}`);
+        }
+
+        // 读取文件为ArrayBuffer
+        const buffer = fs.readFileSync(filePath);
+        return buffer.buffer;
+    } catch (error) {
+        console.error(`读取PDF文件失败: ${filePath}`, error);
+        throw new Error(`读取PDF文件失败: ${error.message}`);
+    }
+});
+
+// 处理字体变更通知，将变更应用到PDF预览窗口
+ipcMain.handle('notify-pdf-font-change', async (event, useCustomFont) => {
+    try {
+        console.log(`处理字体变更: ${useCustomFont ? '预设字体' : '系统字体'}`);
+
+        if (pdfViewerWindow && !pdfViewerWindow.isDestroyed()) {
+            // 发送字体变更事件到PDF预览窗口
+            pdfViewerWindow.webContents.send('font-change', useCustomFont);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('字体变更通知失败:', error);
+        return false;
+    }
+});
+
 ipcMain.handle('get-settings', async () => {
     try {
         const configPath = path.join(coreDir, 'option.yml')
@@ -735,73 +855,6 @@ ipcMain.handle('get-pdf-info', async (event, filePath) => {
     } catch (error) {
         console.error('获取PDF信息失败:', error)
         throw new Error(`无法获取PDF文件信息: ${error.message}`)
-    }
-})
-
-// 在新窗口中打开PDF
-ipcMain.handle('open-pdf-new-window', async (event, filePath) => {
-    try {
-        const fileName = path.basename(filePath)
-
-        // 创建一个新的窗口来显示PDF
-        const pdfWindow = new BrowserWindow({
-            width: 1000,
-            height: 800,
-            title: `PDF预览 - ${fileName}`,
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-                sandbox: false // 需要访问本地文件
-            },
-            icon: path.join(__dirname, 'assets', 'icon', 'icon.png'),
-            show: false
-        })
-
-        // 加载我们的PDF预览页面
-        const viewerPath = path.join(__dirname, 'pdf-viewer.html')
-        const queryParams = new URLSearchParams({
-            file: filePath,
-            name: fileName
-        })
-
-        await pdfWindow.loadFile(viewerPath, { search: queryParams.toString() })
-
-        pdfWindow.setMenuBarVisibility(false)
-
-        pdfWindow.once('ready-to-show', () => {
-            pdfWindow.show()
-        })
-
-        return { success: true, message: 'PDF已在新窗口中打开' }
-    } catch (error) {
-        console.error('在新窗口打开PDF失败:', error)
-        // 如果新窗口失败，尝试用外部程序打开
-        try {
-            const result = await shell.openPath(filePath)
-            return {
-                success: !result,
-                message: result || 'PDF已用外部程序打开（新窗口模式不可用）'
-            }
-        } catch (fallbackError) {
-            throw new Error(`无法打开PDF文件: ${error.message}`)
-        }
-    }
-})
-
-// 外部打开PDF文件
-ipcMain.handle('open-pdf-external', async (event, filePath) => {
-    try {
-        const result = await shell.openPath(filePath)
-        return {
-            success: !result, // shell.openPath returns empty string on success
-            message: result || 'PDF已用外部程序打开'
-        }
-    } catch (error) {
-        console.error('打开PDF失败:', error)
-        return {
-            success: false,
-            message: `无法打开PDF文件: ${error.message}`
-        }
     }
 })
 

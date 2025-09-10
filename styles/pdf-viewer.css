@@ -1,0 +1,284 @@
+/* PDF预览器样式 */
+@font-face {
+    font-family: 'Custom-UI';
+    src: url('../assets/fonts/AaGuXiLaZhangGuanKeAiDeShen-2.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* 确保自定义字体应用于所有元素 */
+.custom-font,
+.custom-font * {
+    font-family: var(--font-ui) !important;
+}
+
+:root {
+    --primary: #6c8cff;
+    --primary-hover: #7c9cff;
+    --dark: #0a0b0f;
+    --dark-card: #1a1b23;
+    --dark-border: #2d3748;
+    --text-primary: #e6e9ef;
+    --text-secondary: #9aa4b2;
+    
+    /* 统一使用与主页面相同的字体变量 */
+    --font-ui: 'Custom-UI', 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: var(--font-ui); /* 确保所有元素使用预设字体 */
+}
+
+body {
+    font-family: var(--font-ui);
+    background: linear-gradient(135deg, var(--dark) 0%, var(--dark-card) 100%);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+}
+
+.pdf-viewer-container {
+    display: flex;
+    height: calc(100vh - 40px); /* 减去标题栏的高度 */
+}
+
+/* 侧边栏 */
+.sidebar {
+    width: 320px;
+    background: rgba(26, 27, 35, 0.9);
+    border-right: 1px solid var(--dark-border);
+    display: flex;
+    flex-direction: column;
+    backdrop-filter: blur(10px);
+}
+
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--dark-border);
+    flex-shrink: 0;
+}
+
+.sidebar-title {
+    font-size: 1.3em;
+    font-weight: 600;
+}
+
+.sidebar-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.pdf-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 0;
+}
+
+.pdf-item {
+    padding: 15px 20px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--dark-border);
+    transition: background-color 0.2s ease;
+}
+
+.pdf-item:hover {
+    background: rgba(108, 140, 255, 0.1);
+}
+
+.pdf-item.active {
+    background: var(--primary);
+    color: white;
+}
+
+.pdf-item.active .pdf-item-info {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.pdf-item-name {
+    font-weight: 500;
+    margin-bottom: 5px;
+    word-break: break-all;
+}
+
+.pdf-item-info {
+    font-size: 0.85em;
+    color: var(--text-secondary);
+}
+
+/* 主内容区 */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 工具栏 */
+.toolbar {
+    background: rgba(26, 27, 35, 0.9);
+    border-bottom: 1px solid var(--dark-border);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    backdrop-filter: blur(10px);
+    flex-shrink: 0;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background: var(--dark-border);
+}
+
+.toolbar button {
+    background: rgba(108, 140, 255, 0.1);
+    border: 1px solid var(--dark-border);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9em;
+    font-family: inherit;
+}
+
+.toolbar button:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.toolbar button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: transparent;
+    border-color: var(--dark-border);
+}
+
+.page-input {
+    width: 60px;
+    background: var(--dark-card);
+    border: 1px solid var(--dark-border);
+    color: var(--text-primary);
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-align: center;
+    font-family: inherit;
+}
+
+.zoom-info {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    min-width: 50px;
+    text-align: center;
+}
+
+/* PDF查看器区域 */
+.pdf-viewer-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 0);
+    background-size: 20px 20px;
+    position: relative;
+}
+
+.pdf-canvas-container {
+    text-align: center;
+    padding: 20px;
+}
+
+#pdf-canvas {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* 占位符和加载状态 */
+.placeholder, .loading {
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.placeholder-icon, .loading-spinner {
+    font-size: 4em;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.placeholder-title, .loading-title {
+    font-size: 1.5em;
+    margin-bottom: 10px;
+}
+
+.placeholder-subtitle {
+    font-size: 1em;
+    opacity: 0.7;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 滚动条样式 */
+.pdf-list::-webkit-scrollbar,
+.pdf-viewer-area::-webkit-scrollbar {
+    width: 8px;
+}
+
+.pdf-list::-webkit-scrollbar-track,
+.pdf-viewer-area::-webkit-scrollbar-track {
+    background: rgba(45, 55, 72, 0.3);
+}
+
+.pdf-list::-webkit-scrollbar-thumb,
+.pdf-viewer-area::-webkit-scrollbar-thumb {
+    background: rgba(108, 140, 255, 0.4);
+    border-radius: 4px;
+}
+
+.pdf-list::-webkit-scrollbar-thumb:hover,
+.pdf-viewer-area::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+}
+
+.empty-list {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+/* 错误信息样式 */
+.error-message {
+    padding: 20px;
+    margin: 20px;
+    background-color: rgba(255, 50, 50, 0.1);
+    border: 1px solid rgba(255, 50, 50, 0.3);
+    border-radius: 8px;
+    color: #ff5555;
+    font-size: 1rem;
+    text-align: center;
+}

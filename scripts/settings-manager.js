@@ -5,7 +5,8 @@ class SettingsManager {
         this.defaultSettings = {
             general: {
                 outputDir: '../PDF',
-                autoOpenDir: false
+                autoOpenDir: false,
+                useCustomFont: true
             },
             download: {
                 domains: [
@@ -40,6 +41,7 @@ class SettingsManager {
         this.outputDirInput = document.getElementById('outputDirInput');
         this.browseOutputDirBtn = document.getElementById('browseOutputDir');
         this.autoOpenDirCheck = document.getElementById('autoOpenDir');
+        this.useCustomFontCheck = document.getElementById('useCustomFont');
 
         // 下载设置
         this.domainList = document.getElementById('domainList');
@@ -76,6 +78,25 @@ class SettingsManager {
         // 常规设置
         this.browseOutputDirBtn.addEventListener('click', () => this.browseOutputDir());
         this.enableProxyCheck.addEventListener('change', () => this.toggleProxySettings());
+        this.useCustomFontCheck.addEventListener('change', () => this.previewFontSetting());
+
+        // 字体选择
+        this.customFontOption = document.getElementById('customFontOption');
+        this.systemFontOption = document.getElementById('systemFontOption');
+
+        if (this.customFontOption && this.systemFontOption) {
+            this.customFontOption.addEventListener('click', () => {
+                this.useCustomFontCheck.checked = true;
+                this.updateFontOptionSelection();
+                this.previewFontSetting();
+            });
+
+            this.systemFontOption.addEventListener('click', () => {
+                this.useCustomFontCheck.checked = false;
+                this.updateFontOptionSelection();
+                this.previewFontSetting();
+            });
+        }
 
         // 下载设置
         this.addDomainBtn.addEventListener('click', () => this.addDomain());
@@ -121,9 +142,15 @@ class SettingsManager {
         try {
             const settings = await window.jmf.getSettings();
             this.currentSettings = { ...this.defaultSettings, ...settings };
+
+            // 应用字体设置
+            this.applyFontSetting(this.currentSettings.general.useCustomFont);
         } catch (error) {
             console.error('加载设置失败:', error);
             this.currentSettings = { ...this.defaultSettings };
+
+            // 应用默认字体设置
+            this.applyFontSetting(this.defaultSettings.general.useCustomFont);
         }
     }
 
@@ -131,6 +158,8 @@ class SettingsManager {
         // 常规设置
         this.outputDirInput.value = this.currentSettings.general.outputDir;
         this.autoOpenDirCheck.checked = this.currentSettings.general.autoOpenDir;
+        this.useCustomFontCheck.checked = this.currentSettings.general.useCustomFont;
+        this.updateFontOptionSelection();
 
         // 下载设置
         this.populateDomainList();
@@ -198,7 +227,8 @@ class SettingsManager {
         return {
             general: {
                 outputDir: this.outputDirInput.value,
-                autoOpenDir: this.autoOpenDirCheck.checked
+                autoOpenDir: this.autoOpenDirCheck.checked,
+                useCustomFont: this.useCustomFontCheck.checked
             },
             download: {
                 domains: [...this.currentSettings.download.domains],
@@ -221,6 +251,9 @@ class SettingsManager {
             await window.jmf.saveSettings(settings);
             this.currentSettings = settings;
 
+            // 应用字体设置
+            this.applyFontSetting(settings.general.useCustomFont);
+
             // 显示保存成功提示
             this.showNotification('设置保存成功', 'success');
 
@@ -237,7 +270,42 @@ class SettingsManager {
             this.currentSettings = { ...this.defaultSettings };
             this.populateForm();
             this.showNotification('已重置为默认设置', 'info');
+            // 恢复默认字体设置
+            this.applyFontSetting(this.defaultSettings.general.useCustomFont);
         }
+    }
+
+    // 更新字体选项的选中状态
+    updateFontOptionSelection() {
+        if (!this.customFontOption || !this.systemFontOption) return;
+
+        const useCustomFont = this.useCustomFontCheck.checked;
+        this.customFontOption.classList.toggle('selected', useCustomFont);
+        this.systemFontOption.classList.toggle('selected', !useCustomFont);
+    }
+
+    // 预览字体设置（在保存前）
+    previewFontSetting() {
+        const useCustomFont = this.useCustomFontCheck.checked;
+        document.body.classList.toggle('use-system-font', !useCustomFont);
+        this.updateFontOptionSelection();
+    }
+
+    // 应用字体设置（保存后）
+    applyFontSetting(useCustomFont) {
+        document.body.classList.toggle('use-system-font', !useCustomFont);
+        this.updateFontOptionSelection();
+
+        // 如果有PDF预览窗口打开，也应用字体设置
+        try {
+            // 发送消息到主进程，让它通知PDF窗口更新字体设置
+            window.jmf.notifyPDFWindowFontChange?.(useCustomFont);
+        } catch (error) {
+            console.warn('无法更新PDF预览窗口的字体设置:', error);
+        }
+
+        // 保存到本地存储，以便在页面加载时应用
+        localStorage.setItem('useCustomFont', useCustomFont);
     }
 
     showNotification(message, type = 'info') {

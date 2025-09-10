@@ -28,7 +28,9 @@
   
   /* 字体变量 */
   --font-ui: 'Custom-UI', 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  --font-ui-system: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
   --font-mono: 'Custom-UI', 'Consolas', 'Monaco', 'Courier New', monospace;
+  --font-mono-system: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
 * {
@@ -484,7 +486,8 @@ body.font-fallback::before {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 2px;
   overflow: hidden;
-  margin: 20px 0;
+  margin: 0 0 20px 0; /* 上边距为0，下边距为20px */
+  display: none; /* 默认隐藏 */
 }
 
 .progress-fill {
@@ -788,6 +791,19 @@ body.font-fallback::before {
   }
 }
 
+/* 系统字体切换 */
+body.use-system-font,
+body.use-system-font * {
+  font-family: var(--font-ui-system) !important;
+}
+
+body.use-system-font .monospace,
+body.use-system-font code,
+body.use-system-font pre,
+body.use-system-font #logView {
+  font-family: var(--font-mono-system) !important;
+}
+
 /* 设置面板样式 */
 .settings-panel {
   width: 70vw;
@@ -876,6 +892,89 @@ body.font-fallback::before {
 .setting-group input[type="checkbox"] {
   width: auto;
   margin: 0;
+}
+
+/* 字体选择样式 */
+.font-options {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.font-option {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.font-option:hover {
+  background: var(--panel-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.font-option.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--glow);
+}
+
+.font-name {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.font-preview {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.font-preview.custom {
+  font-family: var(--font-ui-custom);
+}
+
+.font-preview.system {
+  font-family: var(--font-ui-system);
+}
+
+.font-check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.font-option.selected .font-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.font-check:after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.font-option.selected .font-check:after {
+  opacity: 1;
 }
 
 .domain-list {

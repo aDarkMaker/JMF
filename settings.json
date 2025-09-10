@@ -1,0 +1,25 @@
+{
+  "general": {
+    "outputDir": "D:\\zc\\ZC\\python\\JMcomic\\JMF\\PDF",
+    "autoOpenDir": false,
+    "useCustomFont": true
+  },
+  "download": {
+    "domains": [
+      "18comic-mygo.vip",
+      "18comic-mygo.org",
+      "18comic-MHWs.CC",
+      "jmcomic-zzz.one",
+      "jmcomic-zzz.org"
+    ],
+    "retryTimes": 3,
+    "imageThreads": 20,
+    "enableProxy": true,
+    "proxyAddress": "127.0.0.1:7890"
+  },
+  "advanced": {
+    "enableLog": false,
+    "imageFormat": ".jpg",
+    "enableCache": true
+  }
+}

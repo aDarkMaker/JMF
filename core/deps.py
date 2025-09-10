@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-依赖检查和安装模块
-"""
-
 import sys
 import subprocess
 import importlib
@@ -11,19 +5,16 @@ import os
 from pathlib import Path
 from typing import List, Dict, Tuple
 
-# 设置控制台输出编码，解决中文乱码问题
 if sys.platform.startswith('win'):
     import codecs
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
-    # 设置控制台代码页为UTF-8
     os.system('chcp 65001 >nul 2>&1')
 
 
 class DependencyManager:
     """依赖管理器"""
-    
-    # 核心依赖包映射 (import_name: package_name)
+
     CORE_DEPENDENCIES = {
         'jmcomic': 'jmcomic',
         'yaml': 'PyYAML',
@@ -32,7 +23,6 @@ class DependencyManager:
         'natsort': 'natsort'
     }
     
-    # 可选依赖
     OPTIONAL_DEPENDENCIES = {
         'requests': 'requests',
         'urllib3': 'urllib3'
@@ -45,7 +35,6 @@ class DependencyManager:
         """检查依赖是否已安装"""
         results = {}
         
-        # 检查核心依赖
         for import_name, package_name in self.CORE_DEPENDENCIES.items():
             try:
                 importlib.import_module(import_name)
