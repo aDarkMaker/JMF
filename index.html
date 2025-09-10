@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';" />
+    <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JMcomic Fetcher</title>
+    <link rel="stylesheet" href="./styles/index.css">
+    <script src="./scripts/font-loader.js"></script>
+  </head>
+  <body>
+    <!-- 标题栏 -->
+    <div class="titlebar">
+      <div class="left">
+        <img src="./assets/icon/icon.png" width="20" height="20" alt="icon" />
+        <span class="title">JMcomic Fetcher</span>
+      </div>
+      <div class="right">
+        <div id="btnMin" class="window-btn" title="最小化">−</div>
+        <div id="btnMax" class="window-btn" title="最大化">⬜</div>
+        <div id="btnClose" class="window-btn close" title="关闭">✕</div>
+      </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+      <div class="main-card fade-in">
+        <!-- 头部 -->
+        <div class="header">
+          <h1>JMcomic Fetcher</h1>
+          <div class="status-section">
+            <div class="status-pill" id="status">待命</div>
+            <div class="hint">输入本子ID，点击下载并转换为PDF</div>
+          </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="input-section">
+          <div class="input-wrapper">
+            <input 
+              id="albumId" 
+              type="text" 
+              class="input-field" 
+              placeholder="输入本子ID，如 123456" 
+              maxlength="20"
+            />
+          </div>
+          <button id="btnDownload" class="btn primary">
+            <span>📥</span>
+            下载并转换
+          </button>
+        </div>
+
+        <!-- 进度条 -->
+        <div class="progress-bar" id="progressBar" style="display: none;">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="toolbar">
+          <button id="btnInstall" class="btn success">
+            <span>🔧</span>
+            安装依赖
+          </button>
+          <button id="btnOpenOut" class="btn">
+            <span>📁</span>
+            打开输出目录
+          </button>
+          <button id="btnClear" class="btn danger">
+            <span>🗑️</span>
+            清空日志
+          </button>
+          <button id="btnSettings" class="btn">
+            <span>⚙️</span>
+            设置
+          </button>
+        </div>
+
+        <!-- 日志区域 -->
+        <div class="log-section">
+          <div class="log-header">
+            <h3 class="log-title">运行日志</h3>
+            <div class="hint" id="logHint">等待操作...</div>
+          </div>
+          <div id="log" class="log-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="./scripts/app.js"></script>
+  </body>
+</html>

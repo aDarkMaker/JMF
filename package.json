@@ -11,5 +11,6 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^38.0.0"
-  }
+  },
+  "productName": "JMcomic Fetcher"
 }
