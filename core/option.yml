@@ -1,0 +1,26 @@
+client:
+  domain:
+  - 18comic-mygo.vip
+  - 18comic-mygo.org
+  - 18comic-MHWs.CC
+  - jmcomic-zzz.one
+  - jmcomic-zzz.org
+  impl: api
+  postman:
+    meta_data:
+      cookies:
+        AVS: null
+      proxies: 127.0.0.1:7890
+  retry_times: 3
+dir_rule:
+  base_dir: .
+  rule: Bd_Aid
+download:
+  cache: true
+  image:
+    decode: true
+    suffix: .jpg
+  threading:
+    image: 20
+    photo: 8
+log: true
